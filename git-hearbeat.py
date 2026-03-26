@@ -2,6 +2,7 @@ import requests
 import os
 import sys
 import argparse
+import json
 
 from datetime import datetime, timezone
 from collections import Counter
@@ -69,6 +70,46 @@ def get_most_recently_updated(repos):
 def get_most_starred(repos):
     return max(repos, key=lambda r: r["stargazers_count"], default=None)
 
+def build_stats_data(repos, full_repos):
+    language_counts = get_language_counts(repos)
+    most_recent = get_most_recently_updated(repos)
+    most_starred = get_most_starred(full_repos)
+
+    return {
+        "total_repositories": {
+            "filtered": len(repos),
+            "all": len(full_repos)
+        },
+        "filters": {
+            "language": args.language,
+            "no_forks": args.no_forks,
+            "top": args.top,
+            "sort": args.sort
+        },
+        "most_starred": {
+            "name": most_starred["name"] if most_starred else None,
+            "stars": most_starred["stargazers_count"] if most_starred else 0
+        },
+        "most_recently_updated": {
+            "name": most_recent["name"] if most_recent else None,
+            "updated_at": most_recent["updated_at"] if most_recent else None,
+            "human_readable": time_ago(most_recent["updated_at"]) if most_recent else None
+        },
+        "languages": dict(language_counts),
+        "top_language": (
+            language_counts.most_common(1)[0] if language_counts else None
+        ),
+        "repositories": [
+            {
+                "name": repo["name"],
+                "language": repo["language"],
+                "stars": repo["stargazers_count"],
+                "updated_at": repo["updated_at"]
+            }
+            for repo in repos
+        ]
+    }
+
 def print_stats(repos, full_repos):
     language_counts = get_language_counts(repos)
     most_recent = get_most_recently_updated(repos)
@@ -113,6 +154,7 @@ if __name__ == "__main__":
     parser.add_argument("--no-forks", action="store_true", help="Exclude forked repositories")
     parser.add_argument("--top", type=int, help="Show top N repositories")
     parser.add_argument("--sort", choices=["stars"], help="Sort repositories")
+    parser.add_argument("--output", help="Save output to JSON file")
 
     args = parser.parse_args()
 
@@ -154,5 +196,13 @@ if __name__ == "__main__":
 
     if args.top:
         repos = repos[:args.top]
+
+    if args.output:
+        data = build_stats_data(repos, full_repos)
+
+        with open(args.output, "w") as f:
+            json.dump(data, f, indent=4)
+
+        print(f"\nSaved stats to {args.output}")
 
     print_stats(repos, full_repos)
