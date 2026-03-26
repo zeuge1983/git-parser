@@ -4,7 +4,7 @@ import sys
 import argparse
 import json
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from collections import Counter
 
 from dotenv import load_dotenv
@@ -70,10 +70,13 @@ def get_most_recently_updated(repos):
 def get_most_starred(repos):
     return max(repos, key=lambda r: r["stargazers_count"], default=None)
 
-def build_stats_data(repos, full_repos):
+def build_stats_data(repos, full_repos, username):
     language_counts = get_language_counts(repos)
     most_recent = get_most_recently_updated(repos)
     most_starred = get_most_starred(full_repos)
+    
+    top_by_stars = sorted(repos, key=lambda r: r["stargazers_count"], reverse=True)[:10]
+    repos_for_commits = top_by_stars
 
     return {
         "total_repositories": {
@@ -104,11 +107,83 @@ def build_stats_data(repos, full_repos):
                 "name": repo["name"],
                 "language": repo["language"],
                 "stars": repo["stargazers_count"],
-                "updated_at": repo["updated_at"]
+                "updated_at": repo["updated_at"],
+                "commit_activity": get_commit_activity_for_repo(username, repo["name"])
             }
-            for repo in repos
+            for repo in repos_for_commits
         ]
     }
+
+def get_commit_count(owner, repo_name, since):
+    url = f"https://api.github.com/repos/{owner}/{repo_name}/commits"
+
+    params = {"since": since}
+    count = 0
+    page = 1
+
+    while True:
+        params["page"] = page
+        params["per_page"] = 100
+
+        response = requests.get(url, headers=headers, params=params, timeout=10)
+
+        if response.status_code == 409:
+            return 0
+
+        response.raise_for_status()
+
+        commits = response.json()
+
+        if not commits:
+            break
+
+        count += len(commits)
+        page += 1
+
+    return count
+
+def get_commit_activity_for_repo(owner, repo_name):
+    now = datetime.now(timezone.utc)
+
+    one_year_ago = (now - timedelta(days=365)).isoformat()
+    two_years_ago = (now - timedelta(days=730)).isoformat()
+
+    commits_1y = get_commit_count(owner, repo_name, one_year_ago)
+    commits_2y = get_commit_count(owner, repo_name, two_years_ago)
+
+    return {
+        "last_year": commits_1y,
+        "last_two_years": commits_2y
+    }
+
+def fetch_full_commit_history(owner, repo_name):
+    url = f"https://api.github.com/repos/{owner}/{repo_name}/commits"
+    commits = []
+    page = 1
+
+    while True:
+        params = {"page": page, "per_page": 100}
+        response = requests.get(url, headers=headers, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        if not data:
+            break
+
+        for c in data:
+            commits.append({
+                "sha": c["sha"],
+                "message": c["commit"]["message"],
+                "author": c["commit"]["author"]["name"],
+                "date": c["commit"]["author"]["date"],
+                "url": c["html_url"]
+            })
+
+        if len(data) < 100:
+            break
+        page += 1
+
+    return commits
 
 def print_stats(repos, full_repos):
     language_counts = get_language_counts(repos)
@@ -154,7 +229,8 @@ if __name__ == "__main__":
     parser.add_argument("--no-forks", action="store_true", help="Exclude forked repositories")
     parser.add_argument("--top", type=int, help="Show top N repositories")
     parser.add_argument("--sort", choices=["stars"], help="Sort repositories")
-    parser.add_argument("--output", help="Save output to JSON file")
+    parser.add_argument("--output", default="output.json", help="Save output to JSON file (default: output.json)")
+    parser.add_argument("--repo", help="Fetch full commit history for a specific repository and save to JSON")
 
     args = parser.parse_args()
 
@@ -162,6 +238,20 @@ if __name__ == "__main__":
     print(f"\nFetching data for user: {args.username}...")
 
     url = f"https://api.github.com/users/{args.username}/repos"
+
+    if args.repo:
+        print(f"\nFetching full commit history for {args.username}/{args.repo}...")
+        commits = fetch_full_commit_history(args.username, args.repo)
+        output_file = args.output or "output.json"
+        data = {
+            "repository": f"{args.username}/{args.repo}",
+            "total_commits": len(commits),
+            "commits": commits
+        }
+        with open(output_file, "w") as f:
+            json.dump(data, f, indent=4)
+        print(f"Saved {len(commits)} commits to {output_file}")
+        sys.exit(0)
 
     repos = fetch_repositories(url)
     full_repos = repos.copy()
@@ -197,12 +287,10 @@ if __name__ == "__main__":
     if args.top:
         repos = repos[:args.top]
 
-    if args.output:
-        data = build_stats_data(repos, full_repos)
+    data = build_stats_data(repos, full_repos, args.username)
 
-        with open(args.output, "w") as f:
-            json.dump(data, f, indent=4)
+    with open(args.output, "w") as f:
+        json.dump(data, f, indent=4)
 
-        print(f"\nSaved stats to {args.output}")
-
+    print(f"\nSaved stats to {args.output}")
     print_stats(repos, full_repos)
