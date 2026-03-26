@@ -10,18 +10,19 @@ load_dotenv()
 
 token = os.getenv("GITHUB_TOKEN")
 
-headers = { "Authorization": f"Bearer {token}"} 
-if token:
-    print("Authenticated: Yes")
-else:
-    print("Authenticated: No")
+headers = {"Authorization": f"token {token}"} if token else {}
 
 def fetch_repositories(url):
     repos = []
     params = {"per_page": 100, "page": 1}
     try:
         while True:
-            response = requests.get(url, headers=headers, params=params)
+            response = requests.get(url, headers=headers, params=params, timeout=10)
+
+            if response.status_code == 404:
+                print("User not found (check username)")
+                return []
+            
             response.raise_for_status()
             data = response.json()
             if not data:
@@ -92,7 +93,13 @@ def print_stats(repos):
 
 
 if __name__ == "__main__":
+    print("Authenticated:", "Yes" if token else "No")
+
     username = sys.argv[1] if len(sys.argv) > 1 else None
+
+    if not username:
+        print("Usage: python git-hearbeat.py <github_username>")
+        sys.exit(1)
 
     print(f"\nFetching data for user: {username}...")
 
