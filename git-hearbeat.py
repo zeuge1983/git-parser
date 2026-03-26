@@ -63,7 +63,6 @@ def time_ago(timestamp):
 def get_language_counts(repos):
     return Counter(repo["language"] or "Unknown" for repo in repos)
 
-
 def get_most_recently_updated(repos):
     return max(repos, key=lambda r: r["updated_at"], default=None)
 
