@@ -168,7 +168,7 @@ def get_commit_activity_for_repo(owner, repo_name):
         "last_two_years": commits_2y
     }
 
-def fetch_full_commit_history(owner, repo_name):
+def fetch_full_commit_history(owner, repo_name, limit=None):
     url = f"https://api.github.com/repos/{owner}/{repo_name}/commits"
     commits = []
     page = 1
@@ -198,6 +198,11 @@ def fetch_full_commit_history(owner, repo_name):
             return []
 
         if not data:
+            break
+
+        commits.extend(data)
+        if limit and len(commits) >= limit:
+            commits = commits[:limit]
             break
 
         for c in data:
@@ -261,6 +266,7 @@ if __name__ == "__main__":
     parser.add_argument("--sort", choices=["stars"], help="Sort repositories")
     parser.add_argument("--output", default="output.json", help="Save output to JSON file (default: output.json)")
     parser.add_argument("--repo", help="Fetch full commit history for a specific repository and save to JSON")
+    parser.add_argument("--limit", type=int, help="Limit number of commits fetched")
 
     args = parser.parse_args()
 
@@ -271,7 +277,10 @@ if __name__ == "__main__":
 
     if args.repo:
         print(f"\nFetching full commit history for {args.username}/{args.repo}...")
-        commits = fetch_full_commit_history(args.username, args.repo)
+        commits = fetch_full_commit_history(args.username, args.repo, args.limit)
+
+        print(f"Fetched {len(commits)} commits")
+
         output_file = args.output or "output.json"
         data = {
             "repository": f"{args.username}/{args.repo}",
