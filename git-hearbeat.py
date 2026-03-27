@@ -20,7 +20,17 @@ def fetch_repositories(url):
     try:
         while True:
             response = requests.get(url, headers=headers, params=params, timeout=10)
-
+            
+            # ❗ Handle rate limit
+            if response.status_code == 403:
+                reset_time = response.headers.get("X-RateLimit-Reset")
+                print("Rate limit exceeded while fetching repositories.")
+                if reset_time:
+                    reset_dt = datetime.fromtimestamp(int(reset_time))
+                    print(f"Rate limit resets at: {reset_dt}")
+                return []  # stop everything
+            
+             # ❗ Handle user not found
             if response.status_code == 404:
                 print("User not found (check username)")
                 return []
@@ -30,9 +40,11 @@ def fetch_repositories(url):
             if not data:
                 break
             repos.extend(data)
+
             if len(data) < 100:
                 break
             params["page"] += 1
+
         return repos
     except requests.exceptions.RequestException as e:
         print("Error fetching repositories:", e)
@@ -70,7 +82,7 @@ def get_most_recently_updated(repos):
 def get_most_starred(repos):
     return max(repos, key=lambda r: r["stargazers_count"], default=None)
 
-def build_stats_data(repos, full_repos, username):
+def build_stats_data(repos, full_repos, username, args):
     language_counts = get_language_counts(repos)
     most_recent = get_most_recently_updated(repos)
     most_starred = get_most_starred(full_repos)
@@ -163,9 +175,27 @@ def fetch_full_commit_history(owner, repo_name):
 
     while True:
         params = {"page": page, "per_page": 100}
+
         response = requests.get(url, headers=headers, params=params, timeout=10)
+
         response.raise_for_status()
         data = response.json()
+
+       # ❗ Handle rate limit
+        if response.status_code == 403:
+            reset_time = response.headers.get("X-RateLimit-Reset")
+            print(f"Rate limit exceeded while fetching commits for {repo_name}.")
+
+            if reset_time:
+                reset_dt = datetime.fromtimestamp(int(reset_time))
+                print(f"Rate limit resets at: {reset_dt}")
+
+            break  # keep what we already fetched
+
+        # ❗ Handle empty repo (no commits)
+        if response.status_code == 409:
+            print(f"No commits in repo: {repo_name}")
+            return []
 
         if not data:
             break
@@ -287,7 +317,7 @@ if __name__ == "__main__":
     if args.top:
         repos = repos[:args.top]
 
-    data = build_stats_data(repos, full_repos, args.username)
+    data = build_stats_data(repos, full_repos, args.username, args)
 
     with open(args.output, "w") as f:
         json.dump(data, f, indent=4)

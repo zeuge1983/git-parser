@@ -13,4 +13,4 @@ __pycache__/
 .DS_Store
 
 # json outputstats
-stats.json
+output.json
