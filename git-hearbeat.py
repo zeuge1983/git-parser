@@ -1,5 +1,6 @@
 import requests
 import os
+import re
 import sys
 import argparse
 import json
@@ -269,6 +270,20 @@ if __name__ == "__main__":
     parser.add_argument("--limit", type=int, help="Limit number of commits fetched")
 
     args = parser.parse_args()
+
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", args.username):
+        print("Error: invalid username.", file=sys.stderr)
+        sys.exit(1)
+
+    if args.repo and not re.fullmatch(r"[A-Za-z0-9_.-]+", args.repo):
+        print("Error: invalid repo name.", file=sys.stderr)
+        sys.exit(1)
+
+    if args.output:
+        safe_name = os.path.basename(args.output)
+        if safe_name != args.output or not safe_name:
+            print("Error: --output must be a plain filename with no path components.", file=sys.stderr)
+            sys.exit(1)
 
     print("Authenticated:", "Yes" if token else "No")
     print(f"\nFetching data for user: {args.username}...")
