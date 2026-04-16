@@ -4,6 +4,7 @@ import re
 import sys
 import argparse
 import json
+import logging
 
 from datetime import datetime, timedelta, timezone
 from collections import Counter
@@ -25,15 +26,15 @@ def fetch_repositories(url):
             # ❗ Handle rate limit
             if response.status_code == 403:
                 reset_time = response.headers.get("X-RateLimit-Reset")
-                print("Rate limit exceeded while fetching repositories.")
+                logging.error("Rate limit exceeded while fetching repositories.")
                 if reset_time:
                     reset_dt = datetime.fromtimestamp(int(reset_time))
-                    print(f"Rate limit resets at: {reset_dt}")
+                    logging.warning(f"Rate limit resets at: {reset_dt}")
                 return []  # stop everything
             
              # ❗ Handle user not found
             if response.status_code == 404:
-                print("User not found (check username)")
+                logging.error("User not found (check username)")
                 return []
             
             response.raise_for_status()
@@ -48,7 +49,7 @@ def fetch_repositories(url):
 
         return repos
     except requests.exceptions.RequestException as e:
-        print("Error fetching repositories:", e)
+        logging.error("Error fetching repositories: %s", e)
         return repos
     
 def time_ago(timestamp):
@@ -185,17 +186,17 @@ def fetch_full_commit_history(owner, repo_name, limit=None):
        # ❗ Handle rate limit
         if response.status_code == 403:
             reset_time = response.headers.get("X-RateLimit-Reset")
-            print(f"Rate limit exceeded while fetching commits for {repo_name}.")
+            logging.error(f"Rate limit exceeded while fetching commits for {repo_name}.")
 
             if reset_time:
                 reset_dt = datetime.fromtimestamp(int(reset_time))
-                print(f"Rate limit resets at: {reset_dt}")
+                logging.warning(f"Rate limit resets at: {reset_dt}")
 
             break  # keep what we already fetched
 
         # ❗ Handle empty repo (no commits)
         if response.status_code == 409:
-            print(f"No commits in repo: {repo_name}")
+            logging.error(f"No commits in repo: {repo_name}")
             return []
 
         if not data:
@@ -272,17 +273,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if not re.fullmatch(r"[A-Za-z0-9_.-]+", args.username):
-        print("Error: invalid username.", file=sys.stderr)
+        logging.error("Error: invalid username.", file=sys.stderr)
         sys.exit(1)
 
     if args.repo and not re.fullmatch(r"[A-Za-z0-9_.-]+", args.repo):
-        print("Error: invalid repo name.", file=sys.stderr)
+        logging.error("Error: invalid repo name.", file=sys.stderr)
         sys.exit(1)
 
     if args.output:
         safe_name = os.path.basename(args.output)
         if safe_name != args.output or not safe_name:
-            print("Error: --output must be a plain filename with no path components.", file=sys.stderr)
+            logging.error("Error: --output must be a plain filename with no path components.", file=sys.stderr)
             sys.exit(1)
 
     print("Authenticated:", "Yes" if token else "No")
@@ -311,18 +312,18 @@ if __name__ == "__main__":
     full_repos = repos.copy()
 
     # --- Show active filters (UX) ---
-    print("\n--- Filters ---")
-    if args.language:
-        print(f"language = {args.language}")
-
-    if args.no_forks:
-        print("excluding forks")
-
-    if args.top:
-        print(f"top: {args.top} repositories")
-
-    if args.sort:
-        print(f"sorted by: {args.sort}")
+    if args.language or args.no_forks or args.top or args.sort:
+        print("\nApplied filters:")
+        if args.language:
+            print(f"- Language: {args.language}")
+        if args.no_forks:
+            print("- Exclude forks")
+        if args.top:
+            print(f"- Top {args.top} repositories")
+        if args.sort:
+            print(f"- Sorted by: {args.sort}")
+    else:
+        print("\nNo filters applied, showing all repositories.")
 
     # --- Apply filters ---
     if args.no_forks:
