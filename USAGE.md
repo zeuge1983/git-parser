@@ -1,4 +1,4 @@
-# git-heartbeat.py — Usage Guide
+# git_heartbeat.py — Usage Guide
 
 A CLI tool for fetching GitHub repository statistics and commit history.
 
@@ -24,7 +24,7 @@ A CLI tool for fetching GitHub repository statistics and commit history.
 ### Basic usage — get stats for a user
 
 ```bash
-python git-hearbeat.py octocat
+python git_heartbeat.py octocat
 ```
 
 Prints stats to the console and saves them (including commit activity for the top 10 most-starred repos) to `output.json`.
@@ -32,25 +32,25 @@ Prints stats to the console and saves them (including commit activity for the to
 ### Filter by language
 
 ```bash
-python git-hearbeat.py octocat --language python
+python git_heartbeat.py octocat --language python
 ```
 
 ### Exclude forks and show top 5 repos sorted by stars
 
 ```bash
-python git-hearbeat.py octocat --no-forks --top 5 --sort stars
+python git_heartbeat.py octocat --no-forks --top 5 --sort stars
 ```
 
 ### Save stats to a custom file
 
 ```bash
-python git-hearbeat.py octocat --output my-stats.json
+python git_heartbeat.py octocat --output my-stats.json
 ```
 
 ### Fetch full commit history for a specific repo
 
 ```bash
-python git-hearbeat.py octocat --repo Hello-World
+python git_heartbeat.py octocat --repo Hello-World
 ```
 
 Saves the entire commit history (sha, message, author, date, url) to `output.json`.
@@ -58,7 +58,7 @@ Saves the entire commit history (sha, message, author, date, url) to `output.jso
 ### Fetch commit history and save to a custom file
 
 ```bash
-python git-hearbeat.py octocat --repo Hello-World --output hello-commits.json
+python git_heartbeat.py octocat --repo Hello-World --output hello-commits.json
 ```
 
 ## Notes

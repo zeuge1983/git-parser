@@ -8,8 +8,8 @@ import logging
 
 from datetime import datetime, timedelta, timezone
 from collections import Counter
-
 from dotenv import load_dotenv
+
 load_dotenv()
 
 token = os.getenv("GITHUB_TOKEN")

@@ -41,13 +41,13 @@ A command-line tool that fetches and displays statistics about a GitHub user's r
 ## Usage
 
 ```bash
-python git-hearbeat.py <github_username>
+python git_heartbeat.py <github_username>
 ```
 
 **Example:**
 
 ```bash
-python git-hearbeat.py octocat
+python git_heartbeat.py octocat
 ```
 
 ### Output
