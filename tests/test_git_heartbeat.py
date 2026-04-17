@@ -1,4 +1,5 @@
 from collections import Counter
+from datetime import datetime, timezone
 
 import pytest
 
@@ -44,3 +45,46 @@ import git_heartbeat
 )
 def test_get_language_counts(repos, expected):
     assert git_heartbeat.get_language_counts(repos) == expected
+
+
+# ---------------------------------------------------------------------------
+# time_ago
+# ---------------------------------------------------------------------------
+
+# The function calls datetime.now(timezone.utc) internally, so we freeze
+# "now" to a fixed point in time. Otherwise tests would break the moment
+# a second boundary is crossed.
+FROZEN_NOW = datetime(2025, 4, 15, 12, 0, 0, tzinfo=timezone.utc)
+
+
+class FakeDatetime(datetime):
+    """datetime subclass that returns FROZEN_NOW from .now()."""
+
+    @classmethod
+    def now(cls, tz=None):
+        return FROZEN_NOW
+
+
+@pytest.fixture
+def freeze_time(monkeypatch):
+    # Replace the `datetime` name inside git_heartbeat's namespace.
+    # strptime / replace / etc. are inherited from datetime so they still work.
+    monkeypatch.setattr(git_heartbeat, "datetime", FakeDatetime)
+
+
+@pytest.mark.parametrize(
+    "timestamp, expected",
+    [
+        # 2 days before FROZEN_NOW → days branch
+        ("2025-04-13T12:00:00Z", "2 days ago (2025-04-13)"),
+        # Same day, 2.5 hours before → hours branch (delta.seconds = 9000)
+        ("2025-04-15T09:30:00Z", "2 hours ago (2025-04-15)"),
+        # Same day, 15 minutes before → minutes branch (delta.seconds = 900)
+        ("2025-04-15T11:45:00Z", "15 minutes ago (2025-04-15)"),
+        # 30 seconds before → just now branch (delta.seconds = 30)
+        ("2025-04-15T11:59:30Z", "just now (2025-04-15)"),
+    ],
+    ids=["days", "hours", "minutes", "just_now"],
+)
+def test_time_ago(freeze_time, timestamp, expected):
+    assert git_heartbeat.time_ago(timestamp) == expected
